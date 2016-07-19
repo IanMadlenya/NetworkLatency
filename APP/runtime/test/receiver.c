@@ -33,7 +33,7 @@ typedef struct payload_s {
 
 
 // Program documentation
-static char doc[] = "MeasureLatency -- a program to measure the latency between two network connections";
+static char doc[] = "NetworkLatency receiver -- a program to receive and display the output of the Maxeler NetworkLatency bitstream application";
 static char args_doc[] = "";
 
 // The options the program accepts

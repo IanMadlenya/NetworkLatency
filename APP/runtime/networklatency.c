@@ -32,7 +32,7 @@
 extern max_file_t *NeworkLatency_init();
 
 // Program documentation
-static char doc[] = "NetworkLatency -- a program to measure the latency between two network connections";
+static char doc[] = "NetworkLatency -- a program to measure the latency between two network locations";
 static char args_doc[] = "";
 
 // The options the program accepts

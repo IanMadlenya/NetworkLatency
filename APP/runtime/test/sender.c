@@ -20,7 +20,7 @@
 
 
 // Program documentation
-static char doc[] = "MeasureLatency -- a program to measure the latency between two network connections";
+static char doc[] = "NetworkLatency sender -- a program to simulate sending packets from two network locations to the Maxeler NetworkLatency bitstream application";
 static char args_doc[] = "";
 
 // The options the program accepts
@@ -32,12 +32,10 @@ static struct argp_option options[] = {
 		{"port_bot",	't',	"PORTBOT",	0,	"Port number to use for the bottom DFE network port.", 0 },
 
 		{"latency",		'l',	"LATENCY",	0,	"Microseconds to add in between packets sent to top and bottom DFE ports, "
-												"to simulate extra latency. If the random option is also enabled, the additional "
-												"latency will be a random number of microseconds up to this number.", 0 },
+												"to simulate extra latency.", 0 },
 		{"wait",		'w',	"WAIT",		0,	"Microseconds to wait in between each pair of packets sent. This will not "
 												"add latency to the results, but it will create a pause between each pair of "
-												"timestamps sent to the DFE. If the random option is also enabled, the wait will be "
-												"a random number of microseconds up to this number.", 0 },
+												"timestamps sent to the DFE.", 0},
 		{"friendly",	'f',	0,			0,	"Output in a friendly, human-readable format instead of the default CSV.", 0 },
 		{"send",		's',	"SEND",		0,	"Send SEND total packets to each DFE port.", 0},
 		{ 0, 0, 0, 0, 0, 0 }
