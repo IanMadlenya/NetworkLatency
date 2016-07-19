@@ -24,8 +24,7 @@ second of the two incoming data streams.
 Features
 --------
 
-*   ID numbers up to 19 bits are supported. This could be increased by
-    decreasing the number of bits used to calculate latencies (default 32).
+*   ID numbers up to 19 bits are supported.
 *   Sample C applications are provided to receive the output and to send
     in test packets, with output in both human-readable and CSV formats.
 *   The latency output over UDP is given as a 32-bit unsigned integer in
