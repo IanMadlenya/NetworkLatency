@@ -1,0 +1,67 @@
+package com.maxeler.examples.networklatency;
+
+import com.maxeler.examples.networklatency.NetworkLatencyTypes.KernelToKernelLinkType;
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.Reductions;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.IO.NonBlockingInput;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEStruct;
+
+public class InputIDKernel extends Kernel {
+	public static final String ETHER_IN = "inputFeed";
+	public static final String TIME_STAMP = "inputStamp";
+	public static final String OUT_DATA = "outData";
+
+	InputIDKernel (KernelParameters parameters, NetworkLatencyTypes types) {
+		super(parameters);
+
+		flush.disabled();
+
+		DFEVar port = io.scalarInput("port", dfeUInt(16));
+
+
+		NonBlockingInput<DFEStruct> input = io.nonBlockingInput(
+				ETHER_IN,
+			    types.inputFeedLinkType.getDFEStructType(),
+			    types.inputFeedLinkType.getDFEStructType().getPositionForField(types.inputFeedLinkType.getEOF())
+			    );
+
+		DFEStruct inputStruct = input.data;
+		DFEVar inputValid = input.valid;
+		DFEVar data = inputStruct.get(types.inputFeedLinkType.getData());
+		DFEVar sof = inputStruct.get(types.inputFeedLinkType.getSOF());
+		DFEVar eof = inputStruct.get(types.inputFeedLinkType.getEOF());
+		DFEVar mod = inputStruct.get(types.inputFeedLinkType.getMod());
+
+		DFEVar isStart = inputValid & sof;
+
+		DFEVar timeStamp = io.input(TIME_STAMP, dfeUInt(66));
+		timeStamp = timeStamp.slice(0, types.bitsInTimestamp).cast(dfeUInt(types.bitsInTimestamp));
+		DFEVar startStamp = Reductions.streamHold(timeStamp, isStart);
+
+		EtherManipulator em = new EtherManipulator(this);
+
+		DFEVar etherType = em.captureField(isStart, data, EtherManipulator.ETHERTYPE);
+		DFEVar ipProtocol = em.captureField(isStart, data, EtherManipulator.IP_PROTO);
+		DFEVar dstPort = em.captureField(isStart, data, EtherManipulator.DST_UDP_PORT);
+
+		DFEVar shouldForward = EtherManipulator.byteReverse(etherType) === 0x0800; // ETHERTYPE_IP
+		shouldForward = shouldForward & (ipProtocol === 17); // IPPROTO_UDP
+		shouldForward = shouldForward & (EtherManipulator.byteReverse(dstPort) === port); // port is in Big Endian
+
+		DFEVar udpData = em.captureField(isStart, data, EtherManipulator.UDP_DATA);
+
+		DFEVar packetData = udpData.slice(0, 32).cast(dfeUInt(32));
+		DFEVar packetID = udpData.slice(32, types.bitsInID).cast(dfeUInt(types.bitsInID));
+
+		KernelToKernelLinkType outData = types.kernelFeedType;
+		DFEStruct outputStruct = outData.newInstance(this);
+		outputStruct.get(KernelToKernelLinkType.TIMESTAMP) <== startStamp;
+		outputStruct.get(KernelToKernelLinkType.ID) <== packetID;
+
+		io.output(OUT_DATA, outData, inputValid & shouldForward) <== outputStruct;
+	}
+
+
+}

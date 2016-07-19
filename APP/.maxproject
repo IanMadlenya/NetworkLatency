@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<maxCompilerManager version="2">
+<enginePart internalEngineSubproject="NetworkLatency_EngineCode" isSrcBin="false" isUseDefaultSelected="false" outputLocation="/NetworkLatency_EngineCode/bin" projectName="NetworkLatency"/>
+<cpuPart internalCpuSubproject="NetworkLatency_CPUCode"/>
+<watchedFiles/>
+</maxCompilerManager>

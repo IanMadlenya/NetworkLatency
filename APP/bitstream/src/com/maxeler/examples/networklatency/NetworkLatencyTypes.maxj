@@ -1,0 +1,41 @@
+package com.maxeler.examples.networklatency;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFETypeFactory;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEStructType;
+import com.maxeler.networking.v1.kernel_types.EthernetRXType;
+import com.maxeler.networking.v1.kernel_types.UDPOneToOneTXType;
+
+public class NetworkLatencyTypes {
+	private static final int DEFAULT_ID_BITS = 19;
+	private static final int DEFAULT_TIMESTAMP_BITS = 32;
+
+	public int bitsInID = DEFAULT_ID_BITS;
+	public int bitsInTimestamp = DEFAULT_TIMESTAMP_BITS;
+
+	public EthernetRXType inputFeedLinkType = new EthernetRXType();
+	public KernelToKernelLinkType kernelFeedType;
+	public UDPOneToOneTXType outLinkType = new UDPOneToOneTXType();
+
+
+	public NetworkLatencyTypes(int bitsInID, int bitsInTimestamp) {
+		this.bitsInID = bitsInID;
+		this.bitsInTimestamp = bitsInTimestamp;
+		this.kernelFeedType = new KernelToKernelLinkType(bitsInID, bitsInTimestamp);
+	}
+	public NetworkLatencyTypes() {
+		this(DEFAULT_ID_BITS, DEFAULT_TIMESTAMP_BITS);
+	}
+
+	public static class KernelToKernelLinkType extends DFEStructType {
+		public static final String TIMESTAMP = "stamp";
+		public static final String ID = "id";
+
+		public KernelToKernelLinkType(int bitsInID, int bitsInTimestamp) {
+			super(
+					sft(TIMESTAMP, DFETypeFactory.dfeUInt(bitsInTimestamp)),
+					sft(ID, DFETypeFactory.dfeUInt(bitsInID))
+			);
+
+		}
+	}
+}

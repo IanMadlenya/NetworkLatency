@@ -1,0 +1,73 @@
+package com.maxeler.examples.networklatency;
+
+import com.maxeler.examples.networklatency.NetworkLatencyTypes.KernelToKernelLinkType;
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.memory.Memory;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEStruct;
+
+public class FMemLatencyKernel extends Kernel {
+	public static final String INPUT_A = "inputA";
+	public static final String INPUT_B = "inputB";
+	public static final String OUTPUT = "latencyOut";
+	public static final String SOCKET = "socket";
+
+	protected FMemLatencyKernel(
+			KernelParameters parameters,
+			NetworkLatencyTypes types) {
+
+		super(parameters);
+
+		flush.disabled();
+
+		DFEVar socket = io.scalarInput(SOCKET, dfeUInt(8));
+
+		DFEVar framePart = control.count.simpleCounter(3, 8);
+		DFEVar sof = framePart === 0;
+		DFEVar eof = framePart === 7;
+		DFEVar mod = constant.var(dfeUInt(3), 0);
+
+		DFEStruct inputStructA = io.input(INPUT_A, types.kernelFeedType);
+		DFEStruct inputStructB = io.input(INPUT_B, types.kernelFeedType);
+
+		DFEVar stampA       = inputStructA.get(KernelToKernelLinkType.TIMESTAMP);
+		DFEVar idA          = inputStructA.get(KernelToKernelLinkType.ID);
+
+		DFEVar stampB       = inputStructB.get(KernelToKernelLinkType.TIMESTAMP);
+		DFEVar idB          = inputStructB.get(KernelToKernelLinkType.ID);
+
+		Memory<DFEVar> fmemStamps  = mem.alloc(dfeUInt(types.bitsInTimestamp), (int)(Math.pow(2, types.bitsInID)));
+		fmemStamps.write(idA, stampA, constant.var(true));
+
+		DFEVar savedStamp = fmemStamps.read(idB);
+
+		//If the msb of the 2nd time stamp is 0, and the 2nd stamp
+		//is less than the 1st, most likely that the second stamp
+		//has rolled over to 1 in the n+1 bit for however many bits
+		//the time stamp is keeping
+		DFEVar msbStampB = stampB.slice(types.bitsInTimestamp-1);
+		DFEVar rolled = (stampB < savedStamp) & (msbStampB === 0);
+		DFEVar paddedStampB = constant.var(dfeUInt(1), 1) # stampB;
+		paddedStampB = paddedStampB.cast(dfeUInt(types.bitsInTimestamp+1));
+		DFEVar stampToUse = rolled ? paddedStampB : stampB.cast(dfeUInt(types.bitsInTimestamp+1));
+
+		DFEVar latency = stampToUse.cast(dfeInt(types.bitsInTimestamp+2)) - savedStamp.cast(dfeInt(types.bitsInTimestamp+2));
+		latency = latency < 0 ? 0 : latency;
+		latency = latency.cast(dfeUInt(32));
+		//It takes one cycle to read FMem
+		latency = stream.offset(latency, 1);
+
+		DFEVar outPacket = idB.cast(dfeUInt(32)) # latency;
+
+		DFEStruct outputStruct = types.outLinkType.getDFEStructType().newInstance(this);
+		outputStruct.get(types.outLinkType.getData()) <== outPacket;
+		outputStruct.get(types.outLinkType.getSOF()) <== sof;
+		outputStruct.get(types.outLinkType.getEOF()) <== eof;
+		outputStruct.get(types.outLinkType.getMod()) <== mod;
+		outputStruct.get(types.outLinkType.getSocket()) <== socket;
+
+		io.output(OUTPUT, types.outLinkType.getDFEStructType()) <== outputStruct;
+	}
+
+}

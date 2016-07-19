@@ -1,0 +1,185 @@
+package com.maxeler.examples.networklatency;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelLib;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.Reductions;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.Count.WrapMode;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEType;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+import com.maxeler.maxcompiler.v2.utils.MathUtils;
+
+public class EtherManipulator extends KernelLib {
+	public static final FieldDesc DST_MAC          = new FieldDesc(dfeUInt(48), 0);
+	public static final FieldDesc SRC_MAC          = new FieldDesc(dfeUInt(48), 6);
+	public static final FieldDesc ETHERTYPE        = new FieldDesc(dfeUInt(16), 12);
+
+	public static final FieldDesc IP_VER_IHL       = new FieldDesc(dfeUInt(8),  14);
+	public static final FieldDesc IP_DSCP_ECN      = new FieldDesc(dfeUInt(8),  14+1);
+	public static final FieldDesc IP_TOTALLEN      = new FieldDesc(dfeUInt(16), 14+2);
+	public static final FieldDesc IP_IDENT         = new FieldDesc(dfeUInt(16), 14+4);
+	public static final FieldDesc IP_FLAG_FRAG     = new FieldDesc(dfeUInt(16), 14+6);
+	public static final FieldDesc IP_TTL           = new FieldDesc(dfeUInt(8),  14+8);
+	public static final FieldDesc IP_PROTO         = new FieldDesc(dfeUInt(8),  14+9);
+	public static final FieldDesc IP_CHECKSUM      = new FieldDesc(dfeUInt(16), 14+10);
+	public static final FieldDesc SRC_IP           = new FieldDesc(dfeUInt(32), 14+12);
+	public static final FieldDesc DST_IP           = new FieldDesc(dfeUInt(32), 14+16);
+
+	public static final FieldDesc SRC_UDP_PORT     = new FieldDesc(dfeUInt(16), 14+20);
+	public static final FieldDesc DST_UDP_PORT     = new FieldDesc(dfeUInt(16), 14+20+2);
+	public static final FieldDesc UDP_LENGTH       = new FieldDesc(dfeUInt(16), 14+20+4);
+	public static final FieldDesc UDP_CHECKSUM     = new FieldDesc(dfeUInt(16), 14+20+6);
+	public static final FieldDesc UDP_DATA         = new FieldDesc(dfeUInt(64), 14+20+8);
+
+	protected EtherManipulator(KernelLib owner) {
+		super(owner);
+		// TODO Auto-generated constructor stub
+	}
+
+	public DFEVar to32(DFEVar v) {
+		int w = v.getType().getTotalBits();
+		if (w < 32) {
+			v = constant.var(dfeUInt(32-w), 0) # v;
+		}
+
+		return v.cast(dfeUInt(32));
+	}
+
+	public DFEVar wrap16(DFEVar v) {
+		return sum16(sum16(v)).slice(0, 16).cast(dfeUInt(16));
+	}
+
+	public DFEVar sum16(DFEVar field) {
+		DFEVar sum = constant.var(dfeUInt(32), 0);
+
+		for (int i=0; i < (field.getType().getTotalBits() / 16); i++) {
+			sum += to32(field.slice(i * 16, 16));
+		}
+
+
+		return sum;
+	}
+
+	public static DFEVar byteReverse(DFEVar v) {
+		int size = v.getType().getTotalBits() / 8;
+
+		DFEVar r = null;
+
+		for (int i=0; i < size; i++) {
+			DFEVar b = v.slice(i*8, 8);
+			if (i == 0) r = b;
+			else r = r # b;
+		}
+
+		return r.cast(v.getType());
+	}
+
+
+	public static class FieldDesc {
+		private final int offset;
+		private final DFEType type;
+
+		public FieldDesc(DFEType type, int offset) {
+			this.type = type;
+			this.offset = offset;
+		}
+
+		public DFEType getType() { return type; }
+		public int getByteOffset() { return offset; }
+	}
+
+	public DFEVar captureField(DFEVar isStart, DFEVar data, FieldDesc field) {
+		int wordSizeBytes = data.getType().getTotalBits() / 8;
+		int fieldSizeBytes = field.getType().getTotalBits() / 8;
+		int offsetMod = field.getByteOffset() % wordSizeBytes;
+		int fieldSizeWords = MathUtils.ceilDivide(fieldSizeBytes, wordSizeBytes) + (offsetMod + fieldSizeBytes > wordSizeBytes ? 1 : 0);
+		int startWord = field.getByteOffset() / wordSizeBytes;
+
+
+		DFEVar theWord = stream.offset(data, startWord);
+
+		for (int w=1; w < fieldSizeWords; w++) {
+			theWord = stream.offset(data, startWord + w) # theWord;
+		}
+
+		DFEVar theField = theWord.slice(offsetMod * 8, fieldSizeBytes * 8);
+		theField = Reductions.streamHold(theField, isStart);
+
+		return theField.cast(field.getType());
+	}
+
+	public DFEVar replaceField(DFEVar isStart, DFEVar wordStream, FieldDesc fieldToReplace, DFEVar newFieldData) {
+		int wordSizeBits = wordStream.getType().getTotalBits();
+		int wordSizeBytes = wordSizeBits / 8;
+		int fieldSizeBits = fieldToReplace.getType().getTotalBits();
+		int fieldSizeBytes = fieldSizeBits / 8;
+		int offsetMod = fieldToReplace.getByteOffset() % wordSizeBytes;
+		int fieldSizeWords = MathUtils.ceilDivide(fieldSizeBytes, wordSizeBytes);
+		int neededWords = fieldSizeWords + (offsetMod + fieldSizeBytes > wordSizeBytes ? 1 : 0);
+		int startWord = fieldToReplace.getByteOffset() / wordSizeBytes;
+
+		List<DFEVar> newFieldWords = new ArrayList<DFEVar>();
+
+		int pos = 0;
+		int remBits = fieldSizeBits;
+		boolean firstWord = true;
+		while (remBits > 0) {
+
+			int bitsNow = Math.min(remBits, wordSizeBits - (firstWord ? (offsetMod*8) : 0));
+			DFEVar fieldSlice = newFieldData.slice(pos, bitsNow);
+
+			if (firstWord) {
+				if (offsetMod != 0) {
+					fieldSlice = fieldSlice # wordStream.slice(0, offsetMod * 8);
+				}
+
+				int currentFieldSize = fieldSlice.getType().getTotalBits();
+
+				if (currentFieldSize < wordSizeBits) {
+					fieldSlice = wordStream.slice(currentFieldSize, wordSizeBits - currentFieldSize) # fieldSlice;
+				}
+			} else {
+				if (remBits < wordSizeBits) {
+					fieldSlice = wordStream.slice(remBits, wordSizeBits - remBits) # fieldSlice;
+				}
+			}
+
+
+			newFieldWords.add(fieldSlice);
+			remBits -= bitsNow;
+			pos += bitsNow;
+			firstWord = false;
+		}
+
+
+		DFEVar count = control.count.makeCounter(
+				control.count.makeParams(MathUtils.bitsToRepresent(startWord + neededWords + 1))
+					.withWrapMode(WrapMode.STOP_AT_MAX)
+					.withMax(startWord + neededWords + 1)
+					.withReset(isStart)).getCount();
+		DFEVar fieldStart = count === startWord;
+		DFEVar inField = count < (startWord + neededWords) & count >= startWord;
+	//	DFEVar fieldEnd = count === (startWord + neededWords - 1);
+
+		DFEVar newField;
+
+		if (newFieldWords.size() > 1) {
+			DFEVar newFieldWordSelect = control.count.makeCounter(
+						control.count.makeParams(MathUtils.bitsToAddress(newFieldWords.size()))
+							.withWrapMode(WrapMode.STOP_AT_MAX)
+							.withMax(newFieldWords.size())
+							.withReset(fieldStart)
+					).getCount();
+			newField = control.mux(newFieldWordSelect, newFieldWords);
+		} else {
+			newField = newFieldWords.get(0);
+		}
+
+
+		DFEVar replaced = inField ? newField : wordStream;
+
+		return replaced;
+	}
+
+}

@@ -1,0 +1,85 @@
+package com.maxeler.examples.networklatency;
+
+import com.maxeler.maxcompiler.v2.build.EngineParameters;
+import com.maxeler.maxcompiler.v2.managers.BuildConfig;
+import com.maxeler.maxcompiler.v2.managers.BuildConfig.Effort;
+import com.maxeler.maxcompiler.v2.managers.BuildConfig.OptimizationGoal;
+import com.maxeler.maxcompiler.v2.managers.custom.DFELink;
+import com.maxeler.maxcompiler.v2.managers.custom.ManagerClock;
+import com.maxeler.maxcompiler.v2.managers.custom.blocks.KernelBlock;
+import com.maxeler.maxcompiler.v2.managers.custom.stdlib.DebugLevel;
+import com.maxeler.maxcompiler.v2.managers.custom.stdlib.TimestampFormat;
+import com.maxeler.maxcompiler.v2.managers.custom.stdlib.TimestampSource;
+import com.maxeler.networking.v1.managers.NetworkManager;
+import com.maxeler.networking.v1.managers.netlib.EthernetChecksumMode;
+import com.maxeler.networking.v1.managers.netlib.EthernetStream;
+import com.maxeler.networking.v1.managers.netlib.Max4NetworkConnection;
+import com.maxeler.networking.v1.managers.netlib.UDPChecksumMode;
+import com.maxeler.networking.v1.managers.netlib.UDPConnectionMode;
+import com.maxeler.networking.v1.managers.netlib.UDPStream;
+
+
+public class NetworkLatencyManager extends NetworkManager {
+	public NetworkLatencyManager(EngineParameters configuration) {
+		super(configuration);
+
+		debug.setDebugLevel(new DebugLevel().setHasStreamStatus(true));
+
+		EthernetStream ethTop1 = addEthernetStream(
+				"ethTop1",
+				Max4NetworkConnection.QSFP_TOP_10G_PORT1,
+				EthernetChecksumMode.FlagOnEOF
+				);
+		EthernetStream ethBot1 = addEthernetStream(
+				"ethBot1",
+				Max4NetworkConnection.QSFP_BOT_10G_PORT1,
+				EthernetChecksumMode.FlagOnEOF
+				);
+		UDPStream udpBot1 = addUDPStream(
+				"udpBot1",
+				Max4NetworkConnection.QSFP_BOT_10G_PORT1,
+				UDPConnectionMode.OneToOne,
+				UDPChecksumMode.FlagOnEOF
+				);
+		ManagerClock netClk = getNetworkClock(Max4NetworkConnection.QSFP_BOT_10G_PORT1);
+		pushDefaultClock(netClk);
+
+		DFELink ethRx_A = ethTop1.getReceiveStream();
+		DFELink ethRx_B = ethBot1.getReceiveStream();
+
+		NetworkLatencyTypes typesL = new NetworkLatencyTypes();
+
+		KernelBlock kData_A = addKernel(new InputIDKernel(makeKernelParameters("kData_A"), typesL));
+		KernelBlock kData_B = addKernel(new InputIDKernel(makeKernelParameters("kData_B"), typesL));
+
+		kData_A.getInput(InputIDKernel.ETHER_IN) <== ethRx_A;
+		kData_B.getInput(InputIDKernel.ETHER_IN) <== ethRx_B;
+
+		pushTimestampSource(TimestampSource.HOST_CLOCK);
+		kData_A.getInput(InputIDKernel.TIME_STAMP) <== addTimestampStream("stampA", TimestampFormat.COUNT, 6);
+		kData_B.getInput(InputIDKernel.TIME_STAMP) <== addTimestampStream("stampB", TimestampFormat.COUNT, 6);
+		popTimestampSource();
+
+		KernelBlock kLatency = addKernel(new FMemLatencyKernel(makeKernelParameters("kLatency"), typesL));
+
+		kLatency.getInput(FMemLatencyKernel.INPUT_A) <== kData_A.getOutput(InputIDKernel.OUT_DATA);
+		kLatency.getInput(FMemLatencyKernel.INPUT_B) <== kData_B.getOutput(InputIDKernel.OUT_DATA);
+
+		udpBot1.getTransmitStream() <== kLatency.getOutput(FMemLatencyKernel.OUTPUT);
+	}
+
+	public static void main(String[] args) {
+		NetworkLatencyParameters params = new NetworkLatencyParameters(args);
+		NetworkLatencyManager manager = new NetworkLatencyManager(params);
+
+		BuildConfig bc = manager.getBuildConfig();
+		bc.setBuildEffort(Effort.VERY_HIGH);
+		bc.setOptimizationGoal(OptimizationGoal.SPEED);
+		bc.setMPPRCostTableSearchRange(params.getMPPRStartCT(), params.getMPPREndCT());
+		bc.setMPPRParallelism(params.getMPPRThreads());
+		bc.setMPPRRetryNearMissesThreshold(params.getMPPRRetryThreshold());
+
+		manager.build();
+	}
+
+}
