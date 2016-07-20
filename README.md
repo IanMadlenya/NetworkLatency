@@ -68,8 +68,8 @@ Ensure the environment variables below are correctly set:
 
 To compile the application, run:
 
-	source utils/maxenv.sh
-	source utils/config.sh
+	source project-utils/maxenv.sh
+	source project-utils/config.sh
 	cd bitstream
 	ant
 	ant NetworkLatency

@@ -1,0 +1,3 @@
+[submodule "APP/project-utils"]
+	path = APP/project-utils
+	url = git@github.com:maxeler/project-utils.git
