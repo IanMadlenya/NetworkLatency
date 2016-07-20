@@ -52,7 +52,7 @@ Information for compile
 -----------------------
 
 The project is provided with settings to build for simulation. To build for
-hardware instead, change the following line in [NetworkLatencyTypes.maxj](bitstream/src/com/maxeler/examples/networklatency/NetworkLatencyTypes.maxj) from:
+hardware instead, change the following line in NetworkLatencyTypes.maxj from:
 
 	declareParam(s_parameterTarget, Target.class, Target.DFE_SIM);
 
@@ -68,8 +68,8 @@ Ensure the environment variables below are correctly set:
 
 To compile the application, run:
 
-	source utils/maxenv.sh
-	source utils/config.sh
+	source project-utils/maxenv.sh
+	source project-utils/config.sh
 	cd bitstream
 	ant
 	ant NetworkLatency
@@ -89,7 +89,7 @@ To compile the sample send/receive applications:
 Running the application
 -----------------------
 
-Once compiled, change to the [runtime](runtime/) directory and open three separate
+Once compiled, change to the runtime directory and open three separate
 terminals. In the first, run one of the following commands:
 
 If built for simulation:
