@@ -13,7 +13,10 @@ except ImportError, e:
 
 sender_sources = ['sender.c']
 receiver_sources = ['receiver.c']
+sqlreceiver_sources = ['sql_receiver.c']
 includes = []
+
+ldflags = ['-lsqlite3']
 
 
 cflags = ['-ggdb', '-O2', '-fPIC', 
@@ -24,6 +27,8 @@ def build():
 	link(objects, "sender")
 	objects = compile(receiver_sources)
 	link(objects, "receiver")
+	objects = compile(sqlreceiver_sources)
+	link(objects, "sql_receiver")
 
 def compile(sources):
 	for source in sources:
@@ -32,7 +37,7 @@ def compile(sources):
 	return objects
 
 def link(objects, target):
-	run('gcc', objects, '-o', target)
+	run('gcc', ldflags, objects, '-o', target)
 
 def clean():
 	autoclean()

@@ -66,11 +66,23 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 		case 'D':
 			inet_aton(arg, &arguments->dfe_ip_top);
 			break;
+		case 'd':
+			inet_aton(arg, &arguments->dfe_ip_bot);
+			break;
+		case 'c':
+			inet_aton(arg, &arguments->cpu_ip_bot);
+			break;
 		case 'T':
 			arguments->port_top = atoi(arg);
 			break;
+		case 't':
+			arguments->port_bot = atoi(arg);
+			break;
 		case 'N':
 			inet_aton(arg, &arguments->mask_top);
+			break;
+		case 'n':
+			inet_aton(arg, &arguments->mask_bot);
 			break;
 		case ARGP_KEY_ARG:
 			argp_usage(state);
