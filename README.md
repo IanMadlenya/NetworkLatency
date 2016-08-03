@@ -52,7 +52,7 @@ Information for compile
 -----------------------
 
 The project is provided with settings to build for simulation. To build for
-hardware instead, change the following line in NetworkLatencyTypes.maxj from:
+hardware instead, change the following line in [NetworkLatencyParameters.maxj](APP/bitstream/src/com/maxeler/examples/networklatency/NetworkLatencyParameters.maxj) from:
 
 	declareParam(s_parameterTarget, Target.class, Target.DFE_SIM);
 
