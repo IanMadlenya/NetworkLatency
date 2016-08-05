@@ -14,7 +14,6 @@
 		<pathelement location="bin"/>
 		<pathelement location="${maxeda}"/>
 		<pathelement location="${maxnet}"/>
-		<pathelement location="${maxpowernet}"/>
 	</path>
 
 	<target name="init">
