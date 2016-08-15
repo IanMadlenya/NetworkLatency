@@ -16,6 +16,7 @@ receiver_sources = ['receiver.c']
 #sqlreceiver_sources = ['sql_receiver.c']
 includes = []
 
+ldflags = []
 #ldflags = ['-lsqlite3']
 
 
