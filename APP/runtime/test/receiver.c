@@ -41,7 +41,7 @@ static struct argp_option options[] = {
 		{"cpu_ip_bot",	'c',	"CPUIPBOT",	0,	"IP Address to listen to.", 0 },
 		{"port_bot",	't',	"PORTBOT",	0,	"Port number to use for the bottom DFE network port.", 0 },
 
-		{"friendly",	'f',	0,			0,	"Output in a friendly, human-readable format instead of the default CSV.", 0 },
+		{"csv",		'v',	0,		0,	"Output in CSV format instead of the default human-readable format.", 0 },
 		{ 0, 0, 0, 0, 0, 0 }
 };
 
@@ -49,7 +49,7 @@ static struct argp_option options[] = {
 struct arguments {
 	struct in_addr cpu_ip_bot;
 	int port_bot;
-	int friendly;
+	int csv;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -62,8 +62,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 		case 't':
 			arguments->port_bot = atoi(arg);
 			break;
-		case 'f':
-			arguments->friendly = 1;
+		case 'v':
+			arguments->csv = 1;
 			break;
 		case ARGP_KEY_ARG:
 			argp_usage(state);
@@ -100,7 +100,7 @@ static int create_socket(struct in_addr *local_ip, int port) {
 }
 
 
-static void recv_frames(int sock, int friendly) {
+static void recv_frames(int sock, int csv) {
 	payload_t received_frame;
 
 	while (true) {
@@ -112,10 +112,10 @@ static void recv_frames(int sock, int friendly) {
 
 		double latency = ((double) received_frame.data) / 1000000;
 
-		if (friendly) {
-			printf("Received ID #%08" PRIu32 " with %gs latency.\n", received_frame.id, latency);
-		} else {
+		if (csv) {
 			printf("'R',%08" PRIu32 ",%g\n", received_frame.id, latency);
+		} else {
+			printf("Received ID #%08" PRIu32 " with %gs latency.\n", received_frame.id, latency);
 		}
 		fflush(stdout);
 	}
@@ -126,14 +126,14 @@ int main(int argc, char *argv[]) {
 	//Defaults
 	inet_aton("172.16.60.10", &arguments.cpu_ip_bot);
 	arguments.port_bot = 5008;
-	arguments.friendly = 0;
+	arguments.csv = 0;
 
 	//Parse the arguments
 	argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
 	int mySocket = create_socket(&arguments.cpu_ip_bot, arguments.port_bot);
 
-	recv_frames(mySocket, arguments.friendly);
+	recv_frames(mySocket, arguments.csv);
 
 	return 0;
 }
