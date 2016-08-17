@@ -31,12 +31,12 @@ static struct argp_option options[] = {
 		{"dfe_ip_bot",	'd',	"DFEIPBOT",	0,	"IP Address for the bottom DFE network port.", 0 },
 		{"port_bot",	't',	"PORTBOT",	0,	"Port number to use for the bottom DFE network port.", 0 },
 
-		{"latency",		'l',	"LATENCY",	0,	"Microseconds to add in between packets sent to top and bottom DFE ports, "
+		{"latency",	'l',	"LATENCY",	0,	"Microseconds to add in between packets sent to top and bottom DFE ports, "
 												"to simulate extra latency.", 0 },
-		{"wait",		'w',	"WAIT",		0,	"Microseconds to wait in between each pair of packets sent. This will not "
+		{"wait",	'w',	"WAIT",		0,	"Microseconds to wait in between each pair of packets sent. This will not "
 												"add latency to the results, but it will create a pause between each pair of "
 												"timestamps sent to the DFE.", 0},
-		{"csv",		'c',	0,			0,	"Output in CSV format instead of the default human-readable format.", 0 },
+		{"csv",		'v',	0,			0,	"Output in CSV format instead of the default human-readable format.", 0 },
 		{"send",		's',	"SEND",		0,	"Send SEND total packets to each DFE port.", 0},
 		{ 0, 0, 0, 0, 0, 0 }
 };
@@ -76,7 +76,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 		case 's':
 			arguments->send = (uint32_t) atoll(arg);
 			break;
-		case 'c':
+		case 'v':
 			arguments->csv = 1;
 			break;
 		case ARGP_KEY_ARG:
