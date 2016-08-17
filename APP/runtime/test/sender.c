@@ -36,14 +36,14 @@ static struct argp_option options[] = {
 		{"wait",		'w',	"WAIT",		0,	"Microseconds to wait in between each pair of packets sent. This will not "
 												"add latency to the results, but it will create a pause between each pair of "
 												"timestamps sent to the DFE.", 0},
-		{"friendly",	'f',	0,			0,	"Output in a friendly, human-readable format instead of the default CSV.", 0 },
+		{"csv",		'c',	0,			0,	"Output in CSV format instead of the default human-readable format.", 0 },
 		{"send",		's',	"SEND",		0,	"Send SEND total packets to each DFE port.", 0},
 		{ 0, 0, 0, 0, 0, 0 }
 };
 
 //used by main() to communicate with parse_opt()
 struct arguments {
-	int latency, wait, friendly;
+	int latency, wait, csv;
 	struct in_addr dfe_ip_top;
 	int port_top;
 	struct in_addr dfe_ip_bot;
@@ -76,8 +76,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 		case 's':
 			arguments->send = (uint32_t) atoll(arg);
 			break;
-		case 'f':
-			arguments->friendly = 1;
+		case 'c':
+			arguments->csv = 1;
 			break;
 		case ARGP_KEY_ARG:
 			argp_usage(state);
@@ -131,14 +131,14 @@ static void send_frames(int sock_top, int sock_bot, struct arguments *args) {
 		usleep(args->wait);
 
 
-		if (args->friendly) {
-			printf("Sent in ID #%08" PRIu32 " (data 0x%" PRIx32 ") with %gs additional latency and %gs pause between pairs.\n",
+		if (args->csv) {
+			printf("'S',%08" PRIu32 ",0x%" PRIx32 ",%g,%g\n",
 					source_frame.id,
 					source_frame.data,
 					((double) args->latency) / 1000000,
 					((double) args->wait) / 1000000);
 		} else {
-			printf("'S',%08" PRIu32 ",0x%" PRIx32 ",%g,%g\n",
+			printf("Sent in ID #%08" PRIu32 " (data 0x%" PRIx32 ") with %gs additional latency and %gs pause between pairs.\n",
 					source_frame.id,
 					source_frame.data,
 					((double) args->latency) / 1000000,
@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
 	arguments.latency = 0;
 	arguments.wait = 10000;
 	arguments.send = 200;
-	arguments.friendly = 0;
+	arguments.csv = 0;
 
 	//Parse the arguments
 	argp_parse(&argp, argc, argv, 0, 0, &arguments);
